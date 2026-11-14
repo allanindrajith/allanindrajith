@@ -38,14 +38,6 @@ profile:
 
 ---
 
-### 📈 Activity & Streak
-
-<p align="left">
-  <img src="https://github-readme-streak-stats.herokuapp.com/?user=allanindrajith&theme=dark&background=090909&border=27272a&stroke=a3e635&ring=a3e635&fire=a3e635&currStreakNum=ffffff&sideNums=ffffff&currStreakLabel=a3e635&sideLabels=a1a1aa&dates=71717a" alt="GitHub Streak" />
-</p>
-
----
-
 ### 🌐 Connect With Me
 
 <p align="left">

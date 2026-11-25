@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 171 32" width="171" height="32">
+  <rect x="0.75" y="0.75" width="169.5" height="30.5" rx="8" fill="#11161f" stroke="#242c38" stroke-width="1.2"/>
+  <g transform="translate(12, 8)" fill="#ffdd00"><path d="M2.5 4h9.5a2.5 2.5 0 0 1 0 5h-.7a4.5 4.5 0 0 1-4.3 3.5H5.5A3.5 3.5 0 0 1 2 9V4.5A.5.5 0 0 1 2.5 4zm9 3.5h.5a1 1 0 0 0 0-2h-.5v2zM2 14h10a.75.75 0 0 1 0 1.5H2A.75.75 0 0 1 2 14zM5.2 1.2a.6.6 0 0 1 .6.6v1a.6.6 0 0 1-1.2 0v-1a.6.6 0 0 1 .6-.6zm2.8 0a.6.6 0 0 1 .6.6v1a.6.6 0 0 1-1.2 0v-1a.6.6 0 0 1 .6-.6z"/></g>
+  <text x="35" y="20.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12.5" font-weight="600" fill="#e6edf3">Buy Me a Coffee</text>
+</svg>

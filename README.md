@@ -1,11 +1,11 @@
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=20c492f3" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=9421e54f" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
 
 <p align="left">
-  <a href="https://github.com/allanindrajith"><img src="./assets/pixel-studio/link-github.svg?v=361b6b26" alt="GitHub" height="32" /></a> <a href="https://itsallan.me/"><img src="./assets/pixel-studio/link-website.svg?v=240649aa" alt="Website" height="32" /></a> <a href="https://www.linkedin.com/in/ksallanindrajith"><img src="./assets/pixel-studio/link-linkedin.svg?v=a9a8eb96" alt="LinkedIn" height="32" /></a> <a href="https://www.instagram.com/ksallanindrajith"><img src="./assets/pixel-studio/link-instagram.svg?v=350b8c55" alt="Instagram" height="32" /></a>
+  <a href="https://github.com/allanindrajith"><img src="./assets/pixel-studio/link-github.svg?v=361b6b26" alt="GitHub" height="32" /></a> <a href="https://itsallan.me/"><img src="./assets/pixel-studio/link-website.svg?v=240649aa" alt="Website" height="32" /></a> <a href="https://www.linkedin.com/in/ksallanindrajith"><img src="./assets/pixel-studio/link-linkedin.svg?v=a9a8eb96" alt="LinkedIn" height="32" /></a> <a href="https://www.instagram.com/ksallanindrajith"><img src="./assets/pixel-studio/link-instagram.svg?v=350b8c55" alt="Instagram" height="32" /></a> <a href="https://buymeacoffee.com/allanidrajith"><img src="./assets/pixel-studio/link-coffee.svg?v=8869da53" alt="Buy Me a Coffee" height="32" /></a>
 </p>
 
 <p align="center">

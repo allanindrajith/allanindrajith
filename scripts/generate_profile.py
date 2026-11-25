@@ -521,13 +521,13 @@ def build_about_card(user: dict, avatar_data_uri: str) -> str:
     w, h = 900, 198
     name = html.escape(user.get("name") or USERNAME)
     bio_raw = (user.get("bio") or "Full-stack engineer building AI workflows and modern web apps.").strip()
-    bio_lines = textwrap.wrap(bio_raw, width=64)[:2]
+    bio_lines = textwrap.wrap(bio_raw, width=68)[:3]
     loc = html.escape(user.get("location") or "Lithuania")
     public_repos = sum(1 for r in user["repositories"]["nodes"] if not r.get("isPrivate"))
 
     bio_svg = "\n".join(
-        f'<text x="38" y="{112 + i * 24}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" '
-        f'font-size="15.5" fill="#c9d1d9">{html.escape(line)}</text>'
+        f'<text x="38" y="{110 + i * 22}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" '
+        f'font-size="15" fill="#c9d1d9">{html.escape(line)}</text>'
         for i, line in enumerate(bio_lines)
     )
 
@@ -789,7 +789,7 @@ def write_readme(featured: list[dict]) -> None:
     )
 
     readme = f'''<p align="center">
-  <a><img src="{img_src("desk-hero.svg")}" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
+  <a href="#-"><img src="{img_src("desk-hero.svg")}" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
@@ -799,19 +799,19 @@ def write_readme(featured: list[dict]) -> None:
 </p>
 
 <p align="center">
-  <a><img src="{img_src("about.svg")}" alt="About Allan Indrajith" width="100%" /></a>
+  <a href="#-"><img src="{img_src("about.svg")}" alt="About Allan Indrajith" width="100%" /></a>
 </p>
 
 <p align="center">
-  <a><img src="{img_src("stats-hud.svg")}" alt="GitHub Stats" width="100%" /></a>
+  <a href="#-"><img src="{img_src("stats-hud.svg")}" alt="GitHub Stats" width="100%" /></a>
 </p>
 
 <p align="center">
-  <a><img src="{img_src("tech-stack.svg")}" alt="Tech Stack" width="100%" /></a>
+  <a href="#-"><img src="{img_src("tech-stack.svg")}" alt="Tech Stack" width="100%" /></a>
 </p>
 
 <p align="left">
-  <a><img src="{img_src("projects-header.svg")}" alt="Projects" width="100%" /></a>
+  <a href="#-"><img src="{img_src("projects-header.svg")}" alt="Projects" width="100%" /></a>
 </p>
 
 <!-- PIXEL_STUDIO_PROJECTS:START -->
@@ -819,7 +819,7 @@ def write_readme(featured: list[dict]) -> None:
 <!-- PIXEL_STUDIO_PROJECTS:END -->
 
 <p align="center">
-  <a><img src="{img_src("activity.svg")}" alt="Contribution Activity" width="100%" /></a>
+  <a href="#-"><img src="{img_src("activity.svg")}" alt="Contribution Activity" width="100%" /></a>
 </p>
 '''
     README_PATH.write_text(readme, encoding="utf-8")

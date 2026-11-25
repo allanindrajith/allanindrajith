@@ -1,5 +1,5 @@
 <p align="center">
-  <a><img src="./assets/pixel-studio/desk-hero.svg?v=8507c488" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=b3edb980" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
@@ -9,19 +9,19 @@
 </p>
 
 <p align="center">
-  <a><img src="./assets/pixel-studio/about.svg?v=8001bdd4" alt="About Allan Indrajith" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/about.svg?v=72431dc9" alt="About Allan Indrajith" width="100%" /></a>
 </p>
 
 <p align="center">
-  <a><img src="./assets/pixel-studio/stats-hud.svg?v=f3aa9ef9" alt="GitHub Stats" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/stats-hud.svg?v=4d0c5046" alt="GitHub Stats" width="100%" /></a>
 </p>
 
 <p align="center">
-  <a><img src="./assets/pixel-studio/tech-stack.svg?v=df5fa042" alt="Tech Stack" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/tech-stack.svg?v=df5fa042" alt="Tech Stack" width="100%" /></a>
 </p>
 
 <p align="left">
-  <a><img src="./assets/pixel-studio/projects-header.svg?v=7edf8f7d" alt="Projects" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/projects-header.svg?v=7edf8f7d" alt="Projects" width="100%" /></a>
 </p>
 
 <!-- PIXEL_STUDIO_PROJECTS:START -->
@@ -32,5 +32,5 @@
 <!-- PIXEL_STUDIO_PROJECTS:END -->
 
 <p align="center">
-  <a><img src="./assets/pixel-studio/activity.svg?v=955911ee" alt="Contribution Activity" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/activity.svg?v=334325bb" alt="Contribution Activity" width="100%" /></a>
 </p>

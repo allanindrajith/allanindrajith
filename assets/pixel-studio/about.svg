@@ -2,8 +2,8 @@
   <rect x="1" y="1" width="898" height="196" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
   <text x="38" y="42" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="700" letter-spacing="1.5" fill="#3fb950">&gt; ABOUT</text>
   <text x="38" y="82" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="27" font-weight="700" fill="#f0f6fc">Allan Indrajith</text>
-  <text x="38" y="112" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="15.5" fill="#c9d1d9">Developer &amp; designer crafting stunning, user-friendly websites</text>
-<text x="38" y="136" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="15.5" fill="#c9d1d9">and bold brand identities that merge creativity with</text>
+  <text x="38" y="110" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="15" fill="#c9d1d9">Developer &amp; designer crafting stunning, user-friendly websites and</text>
+<text x="38" y="132" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="15" fill="#c9d1d9">bold brand identities that merge creativity with functionality.</text>
   <text x="38" y="170" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13.5" fill="#8b949e">Vilnius, Lithuania  ·  Full-Stack &amp; AI Systems  ·  24 public repos</text>
   <rect x="739" y="35" width="126" height="126" fill="#e6edf3"/>
   <rect x="742" y="38" width="120" height="120" fill="#0d1117"/>

@@ -23,8 +23,9 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 USERNAME = os.environ.get("GITHUB_USERNAME", "allanindrajith")
-FEATURED_REPOS = ["hivework", "code-clinic", "FinTrack", "taptale"]
-OUT_DIR = Path(__file__).resolve().parent.parent / "assets" / "pixel-studio"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+OUT_DIR = REPO_ROOT / "assets" / "pixel-studio"
+README_PATH = REPO_ROOT / "README.md"
 
 # Vilnius, Lithuania coordinates
 LAT = 54.6872
@@ -143,6 +144,18 @@ def fetch_github_data(token: str) -> dict:
         location
         avatarUrl(size: 160)
         followers { totalCount }
+        pinnedItems(first: 4, types: REPOSITORY) {
+          nodes {
+            ... on Repository {
+              name
+              description
+              stargazerCount
+              url
+              isPrivate
+              primaryLanguage { name color }
+            }
+          }
+        }
         repositories(first: 100, ownerAffiliations: OWNER, isFork: false, orderBy: {field: UPDATED_AT, direction: DESC}) {
           totalCount
           nodes {
@@ -709,18 +722,40 @@ def build_activity_card(weeks: list[dict], cur_streak: int, best_streak: int, ye
 </svg>'''
 
 
-def pick_projects(repos: list[dict]) -> list[dict]:
-    by_name = {r["name"].lower(): r for r in repos if not r.get("isPrivate")}
-    picked = []
-    for fname in FEATURED_REPOS:
-        if fname.lower() in by_name:
-            picked.append(by_name[fname.lower()])
-    for r in repos:
+def pick_projects(user: dict) -> list[dict]:
+    pinned = [r for r in user.get("pinnedItems", {}).get("nodes", []) if r and not r.get("isPrivate")]
+    picked = list(pinned[:4])
+    seen = {r["name"].lower() for r in picked}
+    for r in user["repositories"]["nodes"]:
         if len(picked) >= 4:
             break
-        if not r.get("isPrivate") and r not in picked and r["name"].lower() != USERNAME.lower():
+        if not r.get("isPrivate") and r["name"].lower() not in seen and r["name"].lower() != USERNAME.lower():
             picked.append(r)
+            seen.add(r["name"].lower())
     return picked[:4]
+
+
+def update_readme_projects(featured: list[dict]) -> None:
+    if not README_PATH.exists():
+        return
+    start_marker = "<!-- PIXEL_STUDIO_PROJECTS:START -->"
+    end_marker = "<!-- PIXEL_STUDIO_PROJECTS:END -->"
+    text = README_PATH.read_text(encoding="utf-8")
+    if start_marker not in text or end_marker not in text:
+        return
+
+    def card_tag(idx: int, repo: dict) -> str:
+        url = html.escape(repo.get("url") or f"https://github.com/{USERNAME}/{repo['name']}", quote=True)
+        alt = html.escape(repo["name"], quote=True)
+        return f'<a href="{url}"><img src="./assets/pixel-studio/project-{idx}.svg" alt="{alt}" width="49.3%" /></a>'
+
+    row1 = " ".join(card_tag(i, featured[i]) for i in range(min(2, len(featured))))
+    row2 = " ".join(card_tag(i, featured[i]) for i in range(2, min(4, len(featured))))
+    block = f'<p align="center">\n  {row1}<br />\n  {row2}\n</p>' if row2 else f'<p align="center">\n  {row1}\n</p>'
+
+    before = text.split(start_marker, 1)[0]
+    after = text.split(end_marker, 1)[1]
+    README_PATH.write_text(f"{before}{start_marker}\n{block}\n{end_marker}{after}", encoding="utf-8")
 
 
 def main() -> int:
@@ -759,9 +794,10 @@ def main() -> int:
     (OUT_DIR / "tech-stack.svg").write_text(build_stack_card(top_langs), encoding="utf-8")
     (OUT_DIR / "projects-header.svg").write_text(build_projects_header(), encoding="utf-8")
 
-    featured = pick_projects(repos)
+    featured = pick_projects(user)
     for idx, repo in enumerate(featured):
         (OUT_DIR / f"project-{idx}.svg").write_text(build_project_card(repo), encoding="utf-8")
+    update_readme_projects(featured)
 
     (OUT_DIR / "activity.svg").write_text(
         build_activity_card(weeks, cur_streak, best_streak, year_contribs),

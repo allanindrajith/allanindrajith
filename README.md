@@ -24,10 +24,12 @@
   <img src="./assets/pixel-studio/projects-header.svg" alt="Projects" width="100%" />
 </p>
 
+<!-- PIXEL_STUDIO_PROJECTS:START -->
 <p align="center">
-  <a href="https://github.com/allanindrajith/hivework"><img src="./assets/pixel-studio/project-0.svg" alt="hivework" width="49.3%" /></a> <a href="https://github.com/allanindrajith/code-clinic"><img src="./assets/pixel-studio/project-1.svg" alt="code-clinic" width="49.3%" /></a><br />
-  <a href="https://github.com/allanindrajith/FinTrack"><img src="./assets/pixel-studio/project-2.svg" alt="FinTrack" width="49.3%" /></a> <a href="https://github.com/allanindrajith/taptale"><img src="./assets/pixel-studio/project-3.svg" alt="taptale" width="49.3%" /></a>
+  <a href="https://github.com/allanindrajith/BrainGraph"><img src="./assets/pixel-studio/project-0.svg" alt="BrainGraph" width="49.3%" /></a> <a href="https://github.com/allanindrajith/dumpling"><img src="./assets/pixel-studio/project-1.svg" alt="dumpling" width="49.3%" /></a><br />
+  <a href="https://github.com/allanindrajith/hivework"><img src="./assets/pixel-studio/project-2.svg" alt="hivework" width="49.3%" /></a> <a href="https://github.com/allanindrajith/miloq"><img src="./assets/pixel-studio/project-3.svg" alt="miloq" width="49.3%" /></a>
 </p>
+<!-- PIXEL_STUDIO_PROJECTS:END -->
 
 <p align="center">
   <img src="./assets/pixel-studio/activity.svg" alt="Contribution Activity" width="100%" />

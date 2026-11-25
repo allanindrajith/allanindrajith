@@ -735,27 +735,63 @@ def pick_projects(user: dict) -> list[dict]:
     return picked[:4]
 
 
-def update_readme_projects(featured: list[dict]) -> None:
-    if not README_PATH.exists():
-        return
-    start_marker = "<!-- PIXEL_STUDIO_PROJECTS:START -->"
-    end_marker = "<!-- PIXEL_STUDIO_PROJECTS:END -->"
-    text = README_PATH.read_text(encoding="utf-8")
-    if start_marker not in text or end_marker not in text:
-        return
+def svg_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:8]
+
+
+def write_readme(featured: list[dict]) -> None:
+    def img_src(filename: str) -> str:
+        p = OUT_DIR / filename
+        return f"./assets/pixel-studio/{filename}?v={svg_hash(p)}"
 
     def card_tag(idx: int, repo: dict) -> str:
         url = html.escape(repo.get("url") or f"https://github.com/{USERNAME}/{repo['name']}", quote=True)
         alt = html.escape(repo["name"], quote=True)
-        return f'<a href="{url}"><img src="./assets/pixel-studio/project-{idx}.svg" alt="{alt}" width="49.3%" /></a>'
+        return f'<a href="{url}"><img src="{img_src(f"project-{idx}.svg")}" alt="{alt}" width="49.3%" /></a>'
 
     row1 = " ".join(card_tag(i, featured[i]) for i in range(min(2, len(featured))))
     row2 = " ".join(card_tag(i, featured[i]) for i in range(2, min(4, len(featured))))
-    block = f'<p align="center">\n  {row1}<br />\n  {row2}\n</p>' if row2 else f'<p align="center">\n  {row1}\n</p>'
+    projects_block = (
+        f'<p align="center">\n  {row1}<br />\n  {row2}\n</p>'
+        if row2
+        else f'<p align="center">\n  {row1}\n</p>'
+    )
 
-    before = text.split(start_marker, 1)[0]
-    after = text.split(end_marker, 1)[1]
-    README_PATH.write_text(f"{before}{start_marker}\n{block}\n{end_marker}{after}", encoding="utf-8")
+    readme = f'''<p align="center">
+  <img src="{img_src("desk-hero.svg")}" alt="Allan Indrajith's Pixel Studio" width="100%" />
+</p>
+
+<sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
+
+<p>
+  <a href="https://github.com/allanindrajith">GitHub</a> &nbsp;·&nbsp; <a href="https://itsallan.me/">Website</a> &nbsp;·&nbsp; <a href="https://www.linkedin.com/in/ksallanindrajith">LinkedIn</a>
+</p>
+
+<p align="center">
+  <img src="{img_src("about.svg")}" alt="About Allan Indrajith" width="100%" />
+</p>
+
+<p align="center">
+  <img src="{img_src("stats-hud.svg")}" alt="GitHub Stats" width="100%" />
+</p>
+
+<p align="center">
+  <img src="{img_src("tech-stack.svg")}" alt="Tech Stack" width="100%" />
+</p>
+
+<p align="left">
+  <img src="{img_src("projects-header.svg")}" alt="Projects" width="100%" />
+</p>
+
+<!-- PIXEL_STUDIO_PROJECTS:START -->
+{projects_block}
+<!-- PIXEL_STUDIO_PROJECTS:END -->
+
+<p align="center">
+  <img src="{img_src("activity.svg")}" alt="Contribution Activity" width="100%" />
+</p>
+'''
+    README_PATH.write_text(readme, encoding="utf-8")
 
 
 def main() -> int:
@@ -797,12 +833,12 @@ def main() -> int:
     featured = pick_projects(user)
     for idx, repo in enumerate(featured):
         (OUT_DIR / f"project-{idx}.svg").write_text(build_project_card(repo), encoding="utf-8")
-    update_readme_projects(featured)
 
     (OUT_DIR / "activity.svg").write_text(
         build_activity_card(weeks, cur_streak, best_streak, year_contribs),
         encoding="utf-8",
     )
+    write_readme(featured)
 
     print(f"Generated {len(list(OUT_DIR.glob('*.svg')))} SVGs in {OUT_DIR}")
     return 0

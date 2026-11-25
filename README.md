@@ -1,11 +1,11 @@
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=b3edb980" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=1d544dad" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
 
-<p>
-  <a href="https://github.com/allanindrajith">GitHub</a> &nbsp;·&nbsp; <a href="https://itsallan.me/">Website</a> &nbsp;·&nbsp; <a href="https://www.linkedin.com/in/ksallanindrajith">LinkedIn</a>
+<p align="left">
+  <a href="https://github.com/allanindrajith"><img src="./assets/pixel-studio/link-github.svg?v=361b6b26" alt="GitHub" height="32" /></a> <a href="https://itsallan.me/"><img src="./assets/pixel-studio/link-website.svg?v=240649aa" alt="Website" height="32" /></a> <a href="https://www.linkedin.com/in/ksallanindrajith"><img src="./assets/pixel-studio/link-linkedin.svg?v=a9a8eb96" alt="LinkedIn" height="32" /></a>
 </p>
 
 <p align="center">

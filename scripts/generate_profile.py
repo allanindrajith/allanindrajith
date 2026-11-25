@@ -766,6 +766,41 @@ def pick_projects(user: dict) -> list[dict]:
     return picked[:4]
 
 
+def build_link_pill(label: str, icon_svg: str, accent: str) -> str:
+    w = max(108, int(len(label) * 8.2 + 48))
+    h = 32
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">
+  <rect x="0.75" y="0.75" width="{w - 1.5}" height="{h - 1.5}" rx="8" fill="#11161f" stroke="#242c38" stroke-width="1.2"/>
+  <g transform="translate(12, 8)" fill="{accent}">{icon_svg}</g>
+  <text x="35" y="20.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12.5" font-weight="600" fill="#e6edf3">{html.escape(label)}</text>
+</svg>'''
+
+
+LINK_ITEMS = [
+    (
+        "link-github.svg",
+        "GitHub",
+        "https://github.com/allanindrajith",
+        "#e6edf3",
+        '<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>',
+    ),
+    (
+        "link-website.svg",
+        "Website",
+        "https://itsallan.me/",
+        "#3fb950",
+        '<path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm5.93 7h-2.54a12.7 12.7 0 0 0-1.15-4.38A6.53 6.53 0 0 1 13.93 7zM8 1.55c.78.93 1.47 2.81 1.81 5.45H6.19C6.53 4.36 7.22 2.48 8 1.55zM2.07 9h2.54c.19 1.63.6 3.16 1.15 4.38A6.53 6.53 0 0 1 2.07 9zm2.54-2H2.07a6.53 6.53 0 0 1 3.69-4.38A12.7 12.7 0 0 0 4.61 7zM8 14.45c-.78-.93-1.47-2.81-1.81-5.45h3.62c-.34 2.64-1.03 4.52-1.81 5.45zM10.24 13.38c.55-1.22.96-2.75 1.15-4.38h2.54a6.53 6.53 0 0 1-3.69 4.38z"/>',
+    ),
+    (
+        "link-linkedin.svg",
+        "LinkedIn",
+        "https://www.linkedin.com/in/ksallanindrajith",
+        "#58a6ff",
+        '<path d="M13.63 13.63h-2.37V9.92c0-.89-.02-2.03-1.24-2.03-1.24 0-1.43.97-1.43 1.97v3.77H6.22V6h2.28v1.04h.03c.32-.6 1.09-1.24 2.25-1.24 2.41 0 2.85 1.58 2.85 3.64v4.19zM3.55 4.96a1.38 1.38 0 1 1 0-2.76 1.38 1.38 0 0 1 0 2.76zm1.19 8.67H2.36V6h2.38v7.63zM14.82 0H1.18C.53 0 0 .52 0 1.16v13.68C0 15.48.53 16 1.18 16h13.64c.65 0 1.18-.52 1.18-1.16V1.16C16 .52 15.47 0 14.82 0z"/>',
+    ),
+]
+
+
 def svg_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:8]
 
@@ -788,14 +823,19 @@ def write_readme(featured: list[dict]) -> None:
         else f'<p align="center">\n  {row1}\n</p>'
     )
 
+    links_html = " ".join(
+        f'<a href="{url}"><img src="{img_src(fname)}" alt="{label}" height="32" /></a>'
+        for fname, label, url, _, _ in LINK_ITEMS
+    )
+
     readme = f'''<p align="center">
   <a href="#-"><img src="{img_src("desk-hero.svg")}" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
 
-<p>
-  <a href="https://github.com/allanindrajith">GitHub</a> &nbsp;·&nbsp; <a href="https://itsallan.me/">Website</a> &nbsp;·&nbsp; <a href="https://www.linkedin.com/in/ksallanindrajith">LinkedIn</a>
+<p align="left">
+  {links_html}
 </p>
 
 <p align="center">
@@ -869,6 +909,8 @@ def main() -> int:
         build_activity_card(weeks, cur_streak, best_streak, year_contribs),
         encoding="utf-8",
     )
+    for fname, label, _, accent, icon_svg in LINK_ITEMS:
+        (OUT_DIR / fname).write_text(build_link_pill(label, icon_svg, accent), encoding="utf-8")
     write_readme(featured)
 
     print(f"Generated {len(list(OUT_DIR.glob('*.svg')))} SVGs in {OUT_DIR}")

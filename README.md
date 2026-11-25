@@ -1,5 +1,5 @@
 <p align="center">
-  <a><img src="./assets/pixel-studio/desk-hero.svg?v=adf3cb2d" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
+  <a><img src="./assets/pixel-studio/desk-hero.svg?v=8507c488" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a><img src="./assets/pixel-studio/stats-hud.svg?v=7a2becb3" alt="GitHub Stats" width="100%" /></a>
+  <a><img src="./assets/pixel-studio/stats-hud.svg?v=f3aa9ef9" alt="GitHub Stats" width="100%" /></a>
 </p>
 
 <p align="center">
@@ -26,11 +26,11 @@
 
 <!-- PIXEL_STUDIO_PROJECTS:START -->
 <p align="center">
-  <a href="https://github.com/allanindrajith/BrainGraph"><img src="./assets/pixel-studio/project-0.svg?v=69e5ab99" alt="BrainGraph" width="49.3%" /></a> <a href="https://github.com/allanindrajith/dumpling"><img src="./assets/pixel-studio/project-1.svg?v=92208af2" alt="dumpling" width="49.3%" /></a><br />
-  <a href="https://github.com/allanindrajith/hivework"><img src="./assets/pixel-studio/project-2.svg?v=96ff02ea" alt="hivework" width="49.3%" /></a> <a href="https://github.com/allanindrajith/miloq"><img src="./assets/pixel-studio/project-3.svg?v=887054d4" alt="miloq" width="49.3%" /></a>
+  <a href="https://github.com/allanindrajith/BrainGraph"><img src="./assets/pixel-studio/project-0.svg?v=2f4c4afc" alt="BrainGraph" width="49.3%" /></a> <a href="https://github.com/allanindrajith/dumpling"><img src="./assets/pixel-studio/project-1.svg?v=61ce3872" alt="dumpling" width="49.3%" /></a><br />
+  <a href="https://github.com/allanindrajith/hivework"><img src="./assets/pixel-studio/project-2.svg?v=94189d37" alt="hivework" width="49.3%" /></a> <a href="https://github.com/allanindrajith/miloq"><img src="./assets/pixel-studio/project-3.svg?v=4879e861" alt="miloq" width="49.3%" /></a>
 </p>
 <!-- PIXEL_STUDIO_PROJECTS:END -->
 
 <p align="center">
-  <a><img src="./assets/pixel-studio/activity.svg?v=ef09f7ec" alt="Contribution Activity" width="100%" /></a>
+  <a><img src="./assets/pixel-studio/activity.svg?v=955911ee" alt="Contribution Activity" width="100%" /></a>
 </p>

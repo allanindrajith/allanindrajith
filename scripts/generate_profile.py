@@ -630,12 +630,14 @@ def build_projects_header() -> str:
 </svg>'''
 
 
-def build_pixel_sprite(seed_text: str, bright: str, mid: str, bg: str, ox: int, oy: int, size: int = 104) -> str:
-    """12x12 symmetric 2-tone retro pixel sprite."""
+def build_pixel_sprite(seed_text: str, bright: str, mid: str, bg: str, ox: int, oy: int, size: int = 104) -> tuple[str, float]:
+    """12x12 symmetric 2-tone animated retro pixel sprite (2-frame idle loop)."""
     digest = hashlib.sha256(seed_text.encode("utf-8")).digest()
     cell = 8
     pad = (size - 12 * cell) // 2
-    rects = [f'<rect x="{ox}" y="{oy}" width="{size}" height="{size}" rx="10" fill="{bg}"/>']
+
+    frame1: list[str] = []
+    frame2: list[str] = []
     bit_i = 0
     for r in range(1, 11):
         for c in range(1, 6):
@@ -645,11 +647,25 @@ def build_pixel_sprite(seed_text: str, bright: str, mid: str, bg: str, ox: int, 
             bit_i += 1
             if b0 or (r in (3, 4, 5, 6, 7) and c in (3, 4, 5) and b1):
                 col_fill = bright if b1 else mid
+                # Frame 2: shift outer limbs up 1 cell & subtly alternate highlight for retro idle bounce
+                r2 = r - 1 if (c <= 2 and r > 1) else r
+                col_fill2 = mid if (b1 and (r + c) % 3 == 0) else bright if (not b1 and (r + c) % 4 == 0) else col_fill
                 for col in (c, 11 - c):
                     rx = ox + pad + col * cell
-                    ry = oy + pad + r * cell
-                    rects.append(f'<rect x="{rx}" y="{ry}" width="{cell}" height="{cell}" fill="{col_fill}"/>')
-    return "\n".join(rects)
+                    ry1 = oy + pad + r * cell
+                    ry2 = oy + pad + r2 * cell
+                    frame1.append(f'<rect x="{rx}" y="{ry1}" width="{cell}" height="{cell}" fill="{col_fill}"/>')
+                    frame2.append(f'<rect x="{rx}" y="{ry2}" width="{cell}" height="{cell}" fill="{col_fill2}"/>')
+
+    dur = 1.1 + (digest[0] % 5) * 0.15
+    svg = (
+        f'<rect x="{ox}" y="{oy}" width="{size}" height="{size}" rx="10" fill="{bg}"/>\n'
+        f'<g class="sprite-bob">\n'
+        f'  <g class="f1">{"".join(frame1)}</g>\n'
+        f'  <g class="f2">{"".join(frame2)}</g>\n'
+        f'</g>'
+    )
+    return svg, dur
 
 
 def build_project_card(repo: dict) -> str:
@@ -663,7 +679,7 @@ def build_project_card(repo: dict) -> str:
     lang = (repo.get("primaryLanguage") or {}).get("name") or "Code"
     bright, mid, bg, abbr = LANG_META.get(lang, ("#58a6ff", "#2563eb", "#132238", lang[:2].upper()))
 
-    sprite = build_pixel_sprite(name, bright, mid, bg, ox=20, oy=31, size=104)
+    sprite, dur = build_pixel_sprite(name, bright, mid, bg, ox=20, oy=31, size=104)
     desc_svg = "\n".join(
         f'<text x="146" y="{66 + i * 20}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" '
         f'font-size="13.5" fill="#8b949e">{html.escape(line)}</text>'
@@ -674,6 +690,16 @@ def build_project_card(repo: dict) -> str:
     badge_x = max(290, int(w - 24 - lang_w - 28))
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
+  <defs>
+    <style>
+      @keyframes f1Swap {{ 0%, 49.9% {{ opacity: 1; }} 50%, 100% {{ opacity: 0; }} }}
+      @keyframes f2Swap {{ 0%, 49.9% {{ opacity: 0; }} 50%, 100% {{ opacity: 1; }} }}
+      @keyframes bob {{ 0%, 49.9% {{ transform: translateY(0px); }} 50%, 100% {{ transform: translateY(-2px); }} }}
+      .f1 {{ animation: f1Swap {dur:.2f}s steps(1, end) infinite; }}
+      .f2 {{ animation: f2Swap {dur:.2f}s steps(1, end) infinite; }}
+      .sprite-bob {{ animation: bob {dur:.2f}s steps(1, end) infinite; }}
+    </style>
+  </defs>
   <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
   {sprite}
   <text x="146" y="42" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" font-weight="700" fill="#f0f6fc">{html.escape(name)}</text>

@@ -2,14 +2,15 @@
 """Generate self-hosted Pixel Studio SVG assets for GitHub profile README.
 
 Zero external dependencies (Python 3.9+ stdlib only).
-Pulls live GitHub profile, commits, repos, and language breakdown via GitHub API,
-plus live Vilnius/Lithuania weather via Open-Meteo.
+Pulls live GitHub profile, commits, repos, language breakdown, and contribution calendar
+via GitHub GraphQL/REST API, plus live Vilnius/Lithuania weather via Open-Meteo.
 """
 
 from __future__ import annotations
 
 import base64
 import datetime as dt
+import hashlib
 import html
 import json
 import math
@@ -22,6 +23,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 USERNAME = os.environ.get("GITHUB_USERNAME", "allanindrajith")
+FEATURED_REPOS = ["hivework", "code-clinic", "FinTrack", "taptale"]
 OUT_DIR = Path(__file__).resolve().parent.parent / "assets" / "pixel-studio"
 
 # Vilnius, Lithuania coordinates
@@ -67,23 +69,23 @@ FONT_5X7: dict[str, list[str]] = {
     "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
     "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
     "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
-    "+": ["00000", "00100", "00100", "11111", "00100", "00100", "00000"],
     ">": ["10000", "01000", "00100", "00010", "00100", "01000", "10000"],
     "-": ["00000", "00000", "00000", "11111", "00000", "00000", "00000"],
     " ": ["000", "000", "000", "000", "000", "000", "000"],
 }
 
-LANG_COLORS: dict[str, str] = {
-    "TypeScript": "#3178c6",
-    "JavaScript": "#f1e05a",
-    "Python": "#3572a5",
-    "Swift": "#f05138",
-    "Rust": "#dea584",
-    "Svelte": "#ff3e00",
-    "HTML": "#e34c26",
-    "CSS": "#563d7c",
-    "Go": "#00add8",
-    "Shell": "#89e051",
+# (bright_fg, mid_fg, dark_bg, badge_abbr)
+LANG_META: dict[str, tuple[str, str, str, str]] = {
+    "TypeScript": ("#4d9cf6", "#2563eb", "#132238", "TS"),
+    "JavaScript": ("#f7df6e", "#caa32a", "#2e2912", "JS"),
+    "Python": ("#5aa3e0", "#2f6b9e", "#132538", "PY"),
+    "Swift": ("#ff7052", "#d94126", "#361812", "SW"),
+    "Rust": ("#ebb998", "#c28661", "#332218", "RS"),
+    "Svelte": ("#ff6a33", "#d63300", "#36150b", "SV"),
+    "HTML": ("#f06e48", "#c93f1c", "#33160f", "HT"),
+    "CSS": ("#8364b8", "#563d7c", "#1f172e", "CS"),
+    "Go": ("#38c9eb", "#008fb3", "#0c2933", "GO"),
+    "Shell": ("#9be868", "#5ea832", "#1a2e12", "SH"),
 }
 
 STACK_PILLS = [
@@ -140,11 +142,16 @@ def fetch_github_data(token: str) -> dict:
         websiteUrl
         location
         avatarUrl(size: 160)
+        followers { totalCount }
         repositories(first: 100, ownerAffiliations: OWNER, isFork: false, orderBy: {field: UPDATED_AT, direction: DESC}) {
           totalCount
           nodes {
             name
+            description
+            stargazerCount
+            url
             isPrivate
+            primaryLanguage { name color }
             languages(first: 6, orderBy: {field: SIZE, direction: DESC}) {
               edges { size node { name color } }
             }
@@ -152,6 +159,7 @@ def fetch_github_data(token: str) -> dict:
         }
         contributionsCollection {
           totalCommitContributions
+          totalPullRequestContributions
           contributionCalendar {
             totalContributions
             weeks {
@@ -237,13 +245,34 @@ def aggregate_languages(user: dict) -> list[tuple[str, int, str]]:
             continue
         for edge in repo.get("languages", {}).get("edges", []):
             lname = edge["node"]["name"]
-            lcolor = edge["node"].get("color") or LANG_COLORS.get(lname, "#58a6ff")
+            lcolor = edge["node"].get("color") or LANG_META.get(lname, ("#58a6ff", "", "", ""))[0]
             prev = totals.get(lname, (0, lcolor))[0]
             totals[lname] = (prev + edge["size"], lcolor)
     ranked = sorted(((k, v[0], v[1]) for k, v in totals.items()), key=lambda x: x[1], reverse=True)
     if not ranked:
         return [("TypeScript", 50, "#3178c6"), ("JavaScript", 30, "#f1e05a"), ("Python", 20, "#3572a5")]
     return ranked[:5]
+
+
+def compute_streaks(weeks: list[dict]) -> tuple[int, int]:
+    days = [d for w in weeks for d in w["contributionDays"]]
+    best = 0
+    run = 0
+    for d in days:
+        if d["contributionCount"] > 0:
+            run += 1
+            best = max(best, run)
+        else:
+            run = 0
+
+    cur = 0
+    idx = len(days) - 1
+    if idx >= 0 and days[idx]["contributionCount"] == 0:
+        idx -= 1
+    while idx >= 0 and days[idx]["contributionCount"] > 0:
+        cur += 1
+        idx -= 1
+    return cur, best
 
 
 def render_pixel_text(text: str, x: float, y: float, scale: int, fill: str, letter_gap: int = 1) -> tuple[str, float]:
@@ -390,7 +419,6 @@ def build_desk_hero(user: dict, commits: list[str], top_langs: list[tuple[str, i
     {"".join(stripes)}
     {"".join(floor_svg)}
 
-    <!-- Window -->
     <rect x="56" y="52" width="200" height="136" fill="#101522"/>
     <rect x="64" y="60" width="184" height="120" fill="url(#sky-grad)"/>
     <g clip-path="url(#win-clip)">{"".join(window_fx)}</g>
@@ -399,27 +427,23 @@ def build_desk_hero(user: dict, commits: list[str], top_langs: list[tuple[str, i
     <rect x="48" y="188" width="216" height="12" fill="#5e3d24"/>
     <rect x="48" y="188" width="216" height="4" fill="#784f30"/>
 
-    <!-- Name Plaque -->
     <rect x="{plaque_x - 4}" y="30" width="{plaque_w + 8}" height="58" fill="#0d111b"/>
     <rect x="{plaque_x}" y="34" width="{plaque_w}" height="50" fill="#f3e6cf"/>
     <rect x="{plaque_x + 4}" y="38" width="{plaque_w - 8}" height="42" fill="#efe0c5"/>
     {name_svg}
 
-    <!-- Wall Clock -->
     <circle cx="{cx}" cy="{cy}" r="28" fill="#0d111b"/>
     <circle cx="{cx}" cy="{cy}" r="24" fill="#f3e6cf"/>
     <line x1="{cx}" y1="{cy}" x2="{hx:.1f}" y2="{hy:.1f}" stroke="#1e1b18" stroke-width="4" stroke-linecap="square"/>
     <line x1="{cx}" y1="{cy}" x2="{mx:.1f}" y2="{my:.1f}" stroke="#1e1b18" stroke-width="3" stroke-linecap="square"/>
     <rect x="{cx - 2}" y="{cy - 2}" width="4" height="4" fill="#b45309"/>
 
-    <!-- Bookshelves -->
     {"".join(books_svg)}
     <rect x="668" y="172" width="160" height="12" fill="#6b4426"/>
     <rect x="668" y="172" width="160" height="4" fill="#825533"/>
     <rect x="668" y="236" width="160" height="12" fill="#6b4426"/>
     <rect x="668" y="236" width="160" height="4" fill="#825533"/>
 
-    <!-- Potted Plant -->
     <rect x="148" y="274" width="44" height="46" fill="#9c5530"/>
     <rect x="144" y="266" width="52" height="10" fill="#b8663a"/>
     <rect x="166" y="218" width="8" height="48" fill="#2ea043"/>
@@ -428,14 +452,12 @@ def build_desk_hero(user: dict, commits: list[str], top_langs: list[tuple[str, i
     <rect x="150" y="220" width="20" height="10" fill="#56d364"/>
     <rect x="170" y="212" width="18" height="10" fill="#2ea043"/>
 
-    <!-- Desk Lamp -->
     <rect x="292" y="128" width="40" height="16" fill="#e5c158"/>
     <rect x="296" y="124" width="32" height="6" fill="#f3d678"/>
     <rect x="308" y="144" width="8" height="92" fill="#475569"/>
     <rect x="296" y="234" width="32" height="8" fill="#334155"/>
     <polygon points="292,144 332,144 344,234 278,234" fill="#f5d97e" opacity="0.09"/>
 
-    <!-- Monitor -->
     <rect x="330" y="104" width="248" height="142" fill="#364154"/>
     <rect x="334" y="108" width="240" height="134" fill="#1e2533"/>
     <rect x="340" y="114" width="228" height="122" fill="#0d1320"/>
@@ -443,7 +465,6 @@ def build_desk_hero(user: dict, commits: list[str], top_langs: list[tuple[str, i
     <rect x="444" y="246" width="20" height="14" fill="#334155"/>
     <rect x="424" y="258" width="60" height="6" fill="#475569"/>
 
-    <!-- Coffee Mug -->
     <rect x="556" y="216" width="24" height="26" fill="#e5e7eb"/>
     <rect x="580" y="220" width="8" height="16" fill="#cbd5e1"/>
     <rect x="580" y="224" width="4" height="8" fill="#151c2f"/>
@@ -453,19 +474,16 @@ def build_desk_hero(user: dict, commits: list[str], top_langs: list[tuple[str, i
       <rect x="570" y="200" width="3" height="10" fill="#cbd5e1"/>
     </g>
 
-    <!-- Desk -->
     <rect x="272" y="242" width="364" height="16" fill="#7c4f2c"/>
     <rect x="272" y="242" width="364" height="4" fill="#946138"/>
     <rect x="284" y="258" width="16" height="62" fill="#59371d"/>
     <rect x="608" y="258" width="16" height="62" fill="#59371d"/>
 
-    <!-- Chair -->
     <rect x="466" y="236" width="56" height="36" fill="#2c3545"/>
     <rect x="470" y="240" width="48" height="28" fill="#374256"/>
     <rect x="490" y="272" width="8" height="42" fill="#1f2733"/>
     <rect x="472" y="310" width="44" height="8" fill="#1f2733"/>
 
-    <!-- Sleeping Cat -->
     <rect x="676" y="302" width="82" height="16" fill="#d98a3c"/>
     <rect x="684" y="294" width="64" height="10" fill="#e59a4c"/>
     <rect x="738" y="284" width="24" height="22" fill="#e59a4c"/>
@@ -513,11 +531,35 @@ def build_about_card(user: dict, avatar_data_uri: str) -> str:
 </svg>'''
 
 
+def build_stats_hud(commits: int, public_repos: int, year_contribs: int, best_streak: int) -> str:
+    w, h = 900, 108
+    items = [
+        (str(commits), "COMMITS"),
+        (str(public_repos), "PUBLIC REPOS"),
+        (str(year_contribs), "THIS YEAR"),
+        (f"{best_streak}D", "BEST STREAK"),
+    ]
+    blocks = []
+    col_w = (w - 76) / 4
+    for i, (val, label) in enumerate(items):
+        bx = 38 + i * col_w
+        num_svg, _ = render_pixel_text(val, bx, 26, scale=4, fill="#f0f6fc", letter_gap=1)
+        blocks.append(num_svg)
+        blocks.append(
+            f'<text x="{bx}" y="82" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" '
+            f'font-size="12.5" letter-spacing="1.4" fill="#8b949e">{html.escape(label)}</text>'
+        )
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
+  <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
+  {"".join(blocks)}
+</svg>'''
+
+
 def build_stack_card(top_langs: list[tuple[str, int, str]]) -> str:
     w, h = 900, 174
     total_bytes = sum(sz for _, sz, _ in top_langs) or 1
 
-    # Language bar across card
     bar_x, bar_y, bar_w, bar_h = 38, 62, 824, 12
     segs = []
     cx = bar_x
@@ -526,7 +568,6 @@ def build_stack_card(top_langs: list[tuple[str, int, str]]) -> str:
         segs.append(f'<rect x="{cx}" y="{bar_y}" width="{seg_w}" height="{bar_h}" fill="{lcolor}"/>')
         cx += seg_w
 
-    # Legend below bar
     legend = []
     lx = 38
     for lname, sz, lcolor in top_langs:
@@ -539,7 +580,6 @@ def build_stack_card(top_langs: list[tuple[str, int, str]]) -> str:
         )
         lx += len(label) * 8 + 38
 
-    # Toolkit pills
     pills = []
     px = 38
     for label, col in STACK_PILLS:
@@ -553,9 +593,7 @@ def build_stack_card(top_langs: list[tuple[str, int, str]]) -> str:
         px += pw + 8
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">
-  <defs>
-    <clipPath id="bar-clip"><rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="{bar_h}" rx="4"/></clipPath>
-  </defs>
+  <defs><clipPath id="bar-clip"><rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="{bar_h}" rx="4"/></clipPath></defs>
   <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
   <text x="38" y="42" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="700" letter-spacing="1.5" fill="#3fb950">&gt; STACK</text>
   <g clip-path="url(#bar-clip)">{"".join(segs)}</g>
@@ -564,30 +602,125 @@ def build_stack_card(top_langs: list[tuple[str, int, str]]) -> str:
 </svg>'''
 
 
-def build_stats_hud(commits: int, public_repos: int, year_contribs: int, top_lang: str) -> str:
-    w, h = 900, 108
-    lang_code = top_lang[:2].upper() if top_lang else "TS"
-    items = [
-        (str(commits), "COMMITS"),
-        (str(public_repos), "PUBLIC REPOS"),
-        (str(year_contribs), "THIS YEAR"),
-        (lang_code, f"TOP LANG ({top_lang.upper()})"),
-    ]
-    blocks = []
-    col_w = (w - 76) / 4
-    for i, (val, label) in enumerate(items):
-        bx = 38 + i * col_w
-        num_svg, _ = render_pixel_text(val, bx, 26, scale=4, fill="#f0f6fc", letter_gap=1)
-        blocks.append(num_svg)
-        blocks.append(
-            f'<text x="{bx}" y="82" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" '
-            f'font-size="12.5" letter-spacing="1.3" fill="#8b949e">{html.escape(label)}</text>'
-        )
+def build_projects_header() -> str:
+    w, h = 900, 42
+    hdr_svg, tw = render_pixel_text("> PROJECTS", 2, 8, scale=3, fill="#3fb950", letter_gap=1)
+    line_x = int(tw) + 22
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
+  {hdr_svg}
+  <line x1="{line_x}" y1="19" x2="{w - 2}" y2="19" stroke="#242c38" stroke-width="1.5" stroke-dasharray="5 6"/>
+</svg>'''
+
+
+def build_pixel_sprite(seed_text: str, bright: str, mid: str, bg: str, ox: int, oy: int, size: int = 104) -> str:
+    """12x12 symmetric 2-tone retro pixel sprite."""
+    digest = hashlib.sha256(seed_text.encode("utf-8")).digest()
+    cell = 8
+    pad = (size - 12 * cell) // 2
+    rects = [f'<rect x="{ox}" y="{oy}" width="{size}" height="{size}" rx="10" fill="{bg}"/>']
+    bit_i = 0
+    for r in range(1, 11):
+        for c in range(1, 6):
+            b0 = (digest[(bit_i // 8) % len(digest)] >> (bit_i % 8)) & 1
+            bit_i += 1
+            b1 = (digest[(bit_i // 8) % len(digest)] >> (bit_i % 8)) & 1
+            bit_i += 1
+            if b0 or (r in (3, 4, 5, 6, 7) and c in (3, 4, 5) and b1):
+                col_fill = bright if b1 else mid
+                for col in (c, 11 - c):
+                    rx = ox + pad + col * cell
+                    ry = oy + pad + r * cell
+                    rects.append(f'<rect x="{rx}" y="{ry}" width="{cell}" height="{cell}" fill="{col_fill}"/>')
+    return "\n".join(rects)
+
+
+def build_project_card(repo: dict) -> str:
+    w, h = 444, 166
+    name = repo["name"]
+    desc_raw = (repo.get("description") or "No description provided.").strip()
+    desc_lines = textwrap.wrap(desc_raw, width=36)[:3]
+    if len(desc_lines) == 3 and len(desc_raw) > sum(len(x) for x in desc_lines) + 2:
+        desc_lines[2] = desc_lines[2].rstrip(" .")[:33] + "…"
+    stars = repo.get("stargazerCount", 0)
+    lang = (repo.get("primaryLanguage") or {}).get("name") or "Code"
+    bright, mid, bg, abbr = LANG_META.get(lang, ("#58a6ff", "#2563eb", "#132238", lang[:2].upper()))
+
+    sprite = build_pixel_sprite(name, bright, mid, bg, ox=20, oy=31, size=104)
+    desc_svg = "\n".join(
+        f'<text x="146" y="{66 + i * 20}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" '
+        f'font-size="13.5" fill="#8b949e">{html.escape(line)}</text>'
+        for i, line in enumerate(desc_lines)
+    )
+
+    lang_w = len(lang) * 7.5
+    badge_x = max(290, int(w - 24 - lang_w - 28))
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
   <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
-  {"".join(blocks)}
+  {sprite}
+  <text x="146" y="42" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" font-weight="700" fill="#f0f6fc">{html.escape(name)}</text>
+  {desc_svg}
+  <text x="146" y="142" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13.5" fill="#3fb950">★ {stars}</text>
+  <rect x="{badge_x}" y="128" width="22" height="18" rx="3" fill="{bright}"/>
+  <text x="{badge_x + 11}" y="141" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10.5" font-weight="700" fill="#0d1117">{html.escape(abbr)}</text>
+  <text x="{badge_x + 28}" y="142" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="13.5" fill="#8b949e">{html.escape(lang)}</text>
 </svg>'''
+
+
+def build_activity_card(weeks: list[dict], cur_streak: int, best_streak: int, year_total: int) -> str:
+    w, h = 900, 224
+    recent_weeks = weeks[-26:]
+    levels = ["#1b222c", "#0e4429", "#006d32", "#26a641", "#39d353"]
+
+    def cell_color(c: int) -> str:
+        if c <= 0:
+            return levels[0]
+        if c <= 2:
+            return levels[1]
+        if c <= 5:
+            return levels[2]
+        if c <= 10:
+            return levels[3]
+        return levels[4]
+
+    hdr_svg, _ = render_pixel_text("> ACTIVITY", 38, 28, scale=2, fill="#3fb950", letter_gap=1)
+
+    grid = []
+    gx, gy = 38, 66
+    cell, gap = 16, 4
+    for wi, wk in enumerate(recent_weeks):
+        for di, day in enumerate(wk["contributionDays"]):
+            col = cell_color(day["contributionCount"])
+            grid.append(
+                f'<rect x="{gx + wi * (cell + gap)}" y="{gy + di * (cell + gap)}" '
+                f'width="{cell}" height="{cell}" rx="2" fill="{col}"/>'
+            )
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
+  <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
+  {hdr_svg}
+  {"".join(grid)}
+  <text x="612" y="84" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="1.2" fill="#8b949e">CURRENT STREAK</text>
+  <text x="612" y="108" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="20" font-weight="700" fill="#f0f6fc">{cur_streak} days</text>
+  <text x="612" y="138" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="1.2" fill="#8b949e">BEST STREAK</text>
+  <text x="612" y="162" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="20" font-weight="700" fill="#f0f6fc">{best_streak} days</text>
+  <text x="612" y="190" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="1.2" fill="#8b949e">THIS YEAR</text>
+  <text x="612" y="212" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="20" font-weight="700" fill="#f0f6fc">{year_total}</text>
+</svg>'''
+
+
+def pick_projects(repos: list[dict]) -> list[dict]:
+    by_name = {r["name"].lower(): r for r in repos if not r.get("isPrivate")}
+    picked = []
+    for fname in FEATURED_REPOS:
+        if fname.lower() in by_name:
+            picked.append(by_name[fname.lower()])
+    for r in repos:
+        if len(picked) >= 4:
+            break
+        if not r.get("isPrivate") and r not in picked and r["name"].lower() != USERNAME.lower():
+            picked.append(r)
+    return picked[:4]
 
 
 def main() -> int:
@@ -602,8 +735,11 @@ def main() -> int:
     weather = fetch_weather()
     top_langs = aggregate_languages(user)
 
-    public_repos = sum(1 for r in user["repositories"]["nodes"] if not r.get("isPrivate"))
+    repos = user["repositories"]["nodes"]
+    public_repos = sum(1 for r in repos if not r.get("isPrivate"))
     cc = user["contributionsCollection"]
+    weeks = cc["contributionCalendar"]["weeks"]
+    cur_streak, best_streak = compute_streaks(weeks)
     year_contribs = cc["contributionCalendar"]["totalContributions"]
 
     avatar_data_uri = ""
@@ -616,13 +752,23 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "desk-hero.svg").write_text(build_desk_hero(user, commits, top_langs, weather), encoding="utf-8")
     (OUT_DIR / "about.svg").write_text(build_about_card(user, avatar_data_uri), encoding="utf-8")
-    (OUT_DIR / "tech-stack.svg").write_text(build_stack_card(top_langs), encoding="utf-8")
     (OUT_DIR / "stats-hud.svg").write_text(
-        build_stats_hud(cc["totalCommitContributions"], public_repos, year_contribs, top_langs[0][0]),
+        build_stats_hud(cc["totalCommitContributions"], public_repos, year_contribs, best_streak),
+        encoding="utf-8",
+    )
+    (OUT_DIR / "tech-stack.svg").write_text(build_stack_card(top_langs), encoding="utf-8")
+    (OUT_DIR / "projects-header.svg").write_text(build_projects_header(), encoding="utf-8")
+
+    featured = pick_projects(repos)
+    for idx, repo in enumerate(featured):
+        (OUT_DIR / f"project-{idx}.svg").write_text(build_project_card(repo), encoding="utf-8")
+
+    (OUT_DIR / "activity.svg").write_text(
+        build_activity_card(weeks, cur_streak, best_streak, year_contribs),
         encoding="utf-8",
     )
 
-    print(f"Generated 4 SVGs in {OUT_DIR}")
+    print(f"Generated {len(list(OUT_DIR.glob('*.svg')))} SVGs in {OUT_DIR}")
     return 0
 
 

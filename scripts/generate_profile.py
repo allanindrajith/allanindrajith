@@ -2,7 +2,7 @@
 """Generate self-hosted Pixel Studio SVG assets for GitHub profile README.
 
 Zero external dependencies (Python 3.9+ stdlib only).
-Pulls live GitHub profile, commits, repos, and contribution calendar via GitHub API,
+Pulls live GitHub profile, commits, repos, and language breakdown via GitHub API,
 plus live Vilnius/Lithuania weather via Open-Meteo.
 """
 
@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import base64
 import datetime as dt
-import hashlib
 import html
 import json
 import math
@@ -18,13 +17,11 @@ import os
 import subprocess
 import sys
 import textwrap
-import urllib.error
 import urllib.request
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 USERNAME = os.environ.get("GITHUB_USERNAME", "allanindrajith")
-FEATURED_REPOS = ["hivework", "code-clinic", "FinTrack", "taptale"]
 OUT_DIR = Path(__file__).resolve().parent.parent / "assets" / "pixel-studio"
 
 # Vilnius, Lithuania coordinates
@@ -32,7 +29,7 @@ LAT = 54.6872
 LON = 25.2797
 TZ = ZoneInfo("Europe/Vilnius")
 
-# 5x7 crisp bitmap pixel font (uppercase, digits, symbols)
+# 5x7 crisp bitmap pixel font
 FONT_5X7: dict[str, list[str]] = {
     "A": ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
     "B": ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
@@ -70,24 +67,35 @@ FONT_5X7: dict[str, list[str]] = {
     "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
     "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
     "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
+    "+": ["00000", "00100", "00100", "11111", "00100", "00100", "00000"],
     ">": ["10000", "01000", "00100", "00010", "00100", "01000", "10000"],
     "-": ["00000", "00000", "00000", "11111", "00000", "00000", "00000"],
-    ".": ["00000", "00000", "00000", "00000", "00000", "01100", "01100"],
     " ": ["000", "000", "000", "000", "000", "000", "000"],
 }
 
-LANG_META: dict[str, tuple[str, str, str]] = {
-    "TypeScript": ("#3178c6", "#162d47", "TS"),
-    "JavaScript": ("#f1e05a", "#3a3312", "JS"),
-    "Python": ("#3572a5", "#16293d", "PY"),
-    "Swift": ("#f05138", "#3d1a14", "SW"),
-    "Rust": ("#dea584", "#38261c", "RS"),
-    "Svelte": ("#ff3e00", "#3d170b", "SV"),
-    "HTML": ("#e34c26", "#381810", "HT"),
-    "CSS": ("#563d7c", "#211830", "CS"),
-    "Go": ("#00add8", "#0c2d38", "GO"),
-    "Shell": ("#89e051", "#1d3313", "SH"),
+LANG_COLORS: dict[str, str] = {
+    "TypeScript": "#3178c6",
+    "JavaScript": "#f1e05a",
+    "Python": "#3572a5",
+    "Swift": "#f05138",
+    "Rust": "#dea584",
+    "Svelte": "#ff3e00",
+    "HTML": "#e34c26",
+    "CSS": "#563d7c",
+    "Go": "#00add8",
+    "Shell": "#89e051",
 }
+
+STACK_PILLS = [
+    ("TypeScript", "#3178c6"),
+    ("React / Next.js", "#61dafb"),
+    ("Swift", "#f05138"),
+    ("Python", "#3572a5"),
+    ("Rust / Tauri", "#dea584"),
+    ("Node.js", "#3fb950"),
+    ("AI Agents", "#a371f7"),
+    ("Figma", "#f24e1e"),
+]
 
 
 def get_github_token() -> str:
@@ -132,16 +140,11 @@ def fetch_github_data(token: str) -> dict:
         websiteUrl
         location
         avatarUrl(size: 160)
-        followers { totalCount }
         repositories(first: 100, ownerAffiliations: OWNER, isFork: false, orderBy: {field: UPDATED_AT, direction: DESC}) {
           totalCount
           nodes {
             name
-            description
-            stargazerCount
-            url
             isPrivate
-            primaryLanguage { name color }
             languages(first: 6, orderBy: {field: SIZE, direction: DESC}) {
               edges { size node { name color } }
             }
@@ -149,7 +152,6 @@ def fetch_github_data(token: str) -> dict:
         }
         contributionsCollection {
           totalCommitContributions
-          totalPullRequestContributions
           contributionCalendar {
             totalContributions
             weeks {
@@ -170,7 +172,6 @@ def fetch_github_data(token: str) -> dict:
     )
     user = gql["data"]["user"]
 
-    # Fetch recent public push commits for the scrolling monitor
     commits: list[str] = []
     try:
         events = http_json(f"https://api.github.com/users/{USERNAME}/events/public?per_page=30", headers=headers)
@@ -184,7 +185,6 @@ def fetch_github_data(token: str) -> dict:
     except Exception:
         pass
 
-    # Fallback: fetch latest commits from top recently updated public repos
     if len(commits) < 6:
         public_repos = [r for r in user["repositories"]["nodes"] if not r.get("isPrivate")]
         for r in public_repos[:6]:
@@ -230,26 +230,20 @@ def fetch_weather() -> dict:
         return {"temp": 4, "code": 2, "is_day": 7 <= now.hour < 19}
 
 
-def compute_streaks(weeks: list[dict]) -> tuple[int, int]:
-    days = [d for w in weeks for d in w["contributionDays"]]
-    best = 0
-    run = 0
-    for d in days:
-        if d["contributionCount"] > 0:
-            run += 1
-            best = max(best, run)
-        else:
-            run = 0
-
-    # Current streak (allow today to be 0 if yesterday had contributions)
-    cur = 0
-    idx = len(days) - 1
-    if idx >= 0 and days[idx]["contributionCount"] == 0:
-        idx -= 1
-    while idx >= 0 and days[idx]["contributionCount"] > 0:
-        cur += 1
-        idx -= 1
-    return cur, best
+def aggregate_languages(user: dict) -> list[tuple[str, int, str]]:
+    totals: dict[str, tuple[int, str]] = {}
+    for repo in user["repositories"]["nodes"]:
+        if repo.get("isPrivate"):
+            continue
+        for edge in repo.get("languages", {}).get("edges", []):
+            lname = edge["node"]["name"]
+            lcolor = edge["node"].get("color") or LANG_COLORS.get(lname, "#58a6ff")
+            prev = totals.get(lname, (0, lcolor))[0]
+            totals[lname] = (prev + edge["size"], lcolor)
+    ranked = sorted(((k, v[0], v[1]) for k, v in totals.items()), key=lambda x: x[1], reverse=True)
+    if not ranked:
+        return [("TypeScript", 50, "#3178c6"), ("JavaScript", 30, "#f1e05a"), ("Python", 20, "#3572a5")]
+    return ranked[:5]
 
 
 def render_pixel_text(text: str, x: float, y: float, scale: int, fill: str, letter_gap: int = 1) -> tuple[str, float]:
@@ -277,7 +271,7 @@ def measure_pixel_text(text: str, scale: int, letter_gap: int = 1) -> float:
     return max(0.0, w - letter_gap * scale)
 
 
-def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
+def build_desk_hero(user: dict, commits: list[str], top_langs: list[tuple[str, int, str]], weather: dict) -> str:
     w, h = 900, 410
     now = dt.datetime.now(TZ)
     is_day = weather["is_day"]
@@ -286,36 +280,16 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
     is_snow = wcode in {71, 73, 75, 77, 85, 86}
     is_cloudy = wcode in {2, 3, 45, 48} or is_rain or is_snow
 
-    # Aggregate top languages for bookshelf books
-    lang_sizes: dict[str, tuple[int, str]] = {}
-    for repo in user["repositories"]["nodes"]:
-        if repo.get("isPrivate"):
-            continue
-        for edge in repo.get("languages", {}).get("edges", []):
-            lname = edge["node"]["name"]
-            lcolor = edge["node"].get("color") or LANG_META.get(lname, ("#58a6ff", "", ""))[0]
-            prev = lang_sizes.get(lname, (0, lcolor))[0]
-            lang_sizes[lname] = (prev + edge["size"], lcolor)
-    top_langs = sorted(lang_sizes.items(), key=lambda kv: kv[1][0], reverse=True)[:5]
-    if not top_langs:
-        top_langs = [("TypeScript", (50, "#3178c6")), ("JavaScript", (30, "#f1e05a")), ("Python", (20, "#3572a5"))]
+    stripes = [f'<rect x="{sx}" y="0" width="18" height="316" fill="#1a2238"/>' for sx in range(0, w, 36)]
 
-    # Wallpaper stripes
-    stripes = []
-    for sx in range(0, w, 36):
-        stripes.append(f'<rect x="{sx}" y="0" width="18" height="316" fill="#1a2238"/>')
-
-    # Window sky
     sky_top = "#4b7ec9" if is_day else "#0d1424"
     sky_bot = "#7ba7e0" if is_day else "#151e34"
     window_fx = []
     if is_day:
-        # Pixel sun
         window_fx.append('<rect x="196" y="72" width="24" height="24" fill="#f7d560"/>')
         window_fx.append('<rect x="200" y="68" width="16" height="32" fill="#f7d560"/>')
         window_fx.append('<rect x="192" y="76" width="32" height="16" fill="#f7d560"/>')
     else:
-        # Pixel crescent moon + stars
         window_fx.append('<rect x="202" y="72" width="10" height="24" fill="#f4eed7"/>')
         window_fx.append('<rect x="202" y="88" width="22" height="8" fill="#f4eed7"/>')
         for sx, sy, op in [(74, 70, 0.8), (94, 88, 0.5), (144, 76, 0.9), (168, 108, 0.6), (86, 126, 0.7), (180, 74, 0.8)]:
@@ -342,7 +316,6 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
         for rx, ry in [(82, 128), (116, 104), (148, 122), (196, 126), (220, 114)]:
             window_fx.append(f'<rect class="rain" x="{rx}" y="{ry}" width="4" height="4" fill="#f8fafc"/>')
 
-    # Wall name plaque
     name_str = (user.get("name") or USERNAME).upper()
     name_scale = 4
     name_w = measure_pixel_text(name_str, name_scale, letter_gap=1)
@@ -350,21 +323,17 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
     plaque_x = (w - plaque_w) // 2
     name_svg, _ = render_pixel_text(name_str, plaque_x + (plaque_w - name_w) / 2, 46, name_scale, "#1e1b18", letter_gap=1)
 
-    # Wall clock (real Vilnius time)
     cx, cy = 748, 66
     hour_angle = math.radians(((now.hour % 12) + now.minute / 60.0) * 30.0 - 90.0)
     min_angle = math.radians(now.minute * 6.0 - 90.0)
-    hx = cx + math.cos(hour_angle) * 12
-    hy = cy + math.sin(hour_angle) * 12
-    mx = cx + math.cos(min_angle) * 18
-    my = cy + math.sin(min_angle) * 18
+    hx, hy = cx + math.cos(hour_angle) * 12, cy + math.sin(hour_angle) * 12
+    mx, my = cx + math.cos(min_angle) * 18, cy + math.sin(min_angle) * 18
 
-    # Bookshelf books (top shelf)
     books_svg = []
     bx = 678
     book_heights = [40, 44, 48, 42, 36]
     book_widths = [24, 20, 22, 18, 16]
-    for i, (lname, (_, lcolor)) in enumerate(top_langs):
+    for i, (lname, _, lcolor) in enumerate(top_langs):
         bw = book_widths[i % len(book_widths)]
         bh = book_heights[i % len(book_heights)]
         by = 172 - bh
@@ -375,7 +344,6 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
         books_svg.append(f'<title>{html.escape(lname)}</title>')
         bx += bw + 4
 
-    # Scrolling commits on monitor
     commit_lines = commits[:6] + ["$ git log --oneline"] + commits[:3]
     term_rows = []
     for idx, line in enumerate(commit_lines):
@@ -387,7 +355,6 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
             f'font-size="11" fill="{col}">{html.escape(short)}</text>'
         )
 
-    # Floor planks
     floor_svg = ['<rect x="0" y="316" width="900" height="94" fill="#3a2518"/>']
     for fy in (316, 336, 360, 386):
         floor_svg.append(f'<rect x="0" y="{fy}" width="900" height="3" fill="#26170e"/>')
@@ -403,31 +370,12 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
       <stop offset="100%" stop-color="{sky_bot}"/>
     </linearGradient>
     <style>
-      @keyframes scrollLog {{
-        0% {{ transform: translateY(0px); }}
-        100% {{ transform: translateY(-96px); }}
-      }}
-      @keyframes floatZ {{
-        0%, 100% {{ transform: translateY(0px); opacity: 0.25; }}
-        50% {{ transform: translateY(-8px); opacity: 0.9; }}
-      }}
-      @keyframes steam {{
-        0%, 100% {{ transform: translateY(0px); opacity: 0.25; }}
-        50% {{ transform: translateY(-6px); opacity: 0.7; }}
-      }}
-      @keyframes drift {{
-        0%, 100% {{ transform: translateX(0px); }}
-        50% {{ transform: translateX(6px); }}
-      }}
-      @keyframes twinkle {{
-        0%, 100% {{ opacity: 0.35; }}
-        50% {{ opacity: 1; }}
-      }}
-      @keyframes fall {{
-        0% {{ transform: translateY(-6px); opacity: 0; }}
-        50% {{ opacity: 0.9; }}
-        100% {{ transform: translateY(20px); opacity: 0; }}
-      }}
+      @keyframes scrollLog {{ 0% {{ transform: translateY(0px); }} 100% {{ transform: translateY(-96px); }} }}
+      @keyframes floatZ {{ 0%, 100% {{ transform: translateY(0px); opacity: 0.25; }} 50% {{ transform: translateY(-8px); opacity: 0.9; }} }}
+      @keyframes steam {{ 0%, 100% {{ transform: translateY(0px); opacity: 0.25; }} 50% {{ transform: translateY(-6px); opacity: 0.7; }} }}
+      @keyframes drift {{ 0%, 100% {{ transform: translateX(0px); }} 50% {{ transform: translateX(6px); }} }}
+      @keyframes twinkle {{ 0%, 100% {{ opacity: 0.35; }} 50% {{ opacity: 1; }} }}
+      @keyframes fall {{ 0% {{ transform: translateY(-6px); opacity: 0; }} 50% {{ opacity: 0.9; }} 100% {{ transform: translateY(20px); opacity: 0; }} }}
       .log-scroll {{ animation: scrollLog 14s linear infinite; }}
       .zzz {{ animation: floatZ 3.2s ease-in-out infinite; }}
       .steam {{ animation: steam 2.8s ease-in-out infinite; }}
@@ -438,20 +386,14 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
   </defs>
 
   <g clip-path="url(#hero-round)">
-    <!-- Wall -->
     <rect x="0" y="0" width="{w}" height="316" fill="#151c2f"/>
     {"".join(stripes)}
-
-    <!-- Floor -->
     {"".join(floor_svg)}
 
     <!-- Window -->
     <rect x="56" y="52" width="200" height="136" fill="#101522"/>
     <rect x="64" y="60" width="184" height="120" fill="url(#sky-grad)"/>
-    <g clip-path="url(#win-clip)">
-      {"".join(window_fx)}
-    </g>
-    <!-- Window mullions & sill -->
+    <g clip-path="url(#win-clip)">{"".join(window_fx)}</g>
     <rect x="152" y="60" width="8" height="120" fill="#101522"/>
     <rect x="64" y="116" width="184" height="8" fill="#101522"/>
     <rect x="48" y="188" width="216" height="12" fill="#5e3d24"/>
@@ -477,7 +419,7 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
     <rect x="668" y="236" width="160" height="12" fill="#6b4426"/>
     <rect x="668" y="236" width="160" height="4" fill="#825533"/>
 
-    <!-- Potted Plant (left) -->
+    <!-- Potted Plant -->
     <rect x="148" y="274" width="44" height="46" fill="#9c5530"/>
     <rect x="144" y="266" width="52" height="10" fill="#b8663a"/>
     <rect x="166" y="218" width="8" height="48" fill="#2ea043"/>
@@ -486,7 +428,7 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
     <rect x="150" y="220" width="20" height="10" fill="#56d364"/>
     <rect x="170" y="212" width="18" height="10" fill="#2ea043"/>
 
-    <!-- Desk Lamp (left of monitor) -->
+    <!-- Desk Lamp -->
     <rect x="292" y="128" width="40" height="16" fill="#e5c158"/>
     <rect x="296" y="124" width="32" height="6" fill="#f3d678"/>
     <rect x="308" y="144" width="8" height="92" fill="#475569"/>
@@ -497,16 +439,11 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
     <rect x="330" y="104" width="248" height="142" fill="#364154"/>
     <rect x="334" y="108" width="240" height="134" fill="#1e2533"/>
     <rect x="340" y="114" width="228" height="122" fill="#0d1320"/>
-    <g clip-path="url(#screen-clip)">
-      <g class="log-scroll">
-        {"".join(term_rows)}
-      </g>
-    </g>
-    <!-- Monitor stand -->
+    <g clip-path="url(#screen-clip)"><g class="log-scroll">{"".join(term_rows)}</g></g>
     <rect x="444" y="246" width="20" height="14" fill="#334155"/>
     <rect x="424" y="258" width="60" height="6" fill="#475569"/>
 
-    <!-- Coffee Mug (right of monitor) -->
+    <!-- Coffee Mug -->
     <rect x="556" y="216" width="24" height="26" fill="#e5e7eb"/>
     <rect x="580" y="220" width="8" height="16" fill="#cbd5e1"/>
     <rect x="580" y="224" width="4" height="8" fill="#151c2f"/>
@@ -528,16 +465,14 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
     <rect x="490" y="272" width="8" height="42" fill="#1f2733"/>
     <rect x="472" y="310" width="44" height="8" fill="#1f2733"/>
 
-    <!-- Sleeping Cat (right floor) -->
+    <!-- Sleeping Cat -->
     <rect x="676" y="302" width="82" height="16" fill="#d98a3c"/>
     <rect x="684" y="294" width="64" height="10" fill="#e59a4c"/>
-    <!-- Cat head & ears -->
     <rect x="738" y="284" width="24" height="22" fill="#e59a4c"/>
     <rect x="740" y="278" width="6" height="6" fill="#d98a3c"/>
     <rect x="754" y="278" width="6" height="6" fill="#d98a3c"/>
     <rect x="744" y="294" width="4" height="2" fill="#26170e"/>
     <rect x="752" y="294" width="4" height="2" fill="#26170e"/>
-    <!-- Cat tail -->
     <rect x="664" y="308" width="14" height="6" fill="#c27429"/>
     <g class="zzz" fill="#94a3b8" font-family="ui-monospace,monospace" font-size="14" font-weight="700">
       <text x="770" y="274">Z</text>
@@ -546,46 +481,97 @@ def build_desk_hero(user: dict, commits: list[str], weather: dict) -> str:
 </svg>'''
 
 
-def build_about_card(user: dict, total_stars: int, avatar_data_uri: str) -> str:
-    w, h = 900, 206
+def build_about_card(user: dict, avatar_data_uri: str) -> str:
+    w, h = 900, 198
     name = html.escape(user.get("name") or USERNAME)
-    bio_raw = (user.get("bio") or "Software engineer building modern applications.").strip()
-    bio_lines = textwrap.wrap(bio_raw, width=62)[:2]
+    bio_raw = (user.get("bio") or "Full-stack engineer building AI workflows and modern web apps.").strip()
+    bio_lines = textwrap.wrap(bio_raw, width=64)[:2]
     loc = html.escape(user.get("location") or "Lithuania")
-    followers = user["followers"]["totalCount"]
-    repos = user["repositories"]["totalCount"]
+    public_repos = sum(1 for r in user["repositories"]["nodes"] if not r.get("isPrivate"))
 
     bio_svg = "\n".join(
-        f'<text x="38" y="{114 + i * 24}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" '
-        f'font-size="16" fill="#c9d1d9">{html.escape(line)}</text>'
+        f'<text x="38" y="{112 + i * 24}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" '
+        f'font-size="15.5" fill="#c9d1d9">{html.escape(line)}</text>'
         for i, line in enumerate(bio_lines)
     )
 
     avatar_el = (
-        f'<image href="{avatar_data_uri}" x="738" y="42" width="120" height="120" preserveAspectRatio="xMidYMid slice" style="image-rendering:pixelated"/>'
+        f'<image href="{avatar_data_uri}" x="744" y="40" width="116" height="116" preserveAspectRatio="xMidYMid slice" style="image-rendering:pixelated"/>'
         if avatar_data_uri
-        else '<rect x="738" y="42" width="120" height="120" fill="#21262d"/>'
+        else '<rect x="744" y="40" width="116" height="116" fill="#21262d"/>'
     )
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">
   <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
-  <text x="38" y="44" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="700" letter-spacing="1.5" fill="#3fb950">&gt; ABOUT</text>
-  <text x="38" y="84" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="28" font-weight="700" fill="#f0f6fc">{name}</text>
+  <text x="38" y="42" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="700" letter-spacing="1.5" fill="#3fb950">&gt; ABOUT</text>
+  <text x="38" y="82" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="27" font-weight="700" fill="#f0f6fc">{name}</text>
   {bio_svg}
-  <text x="38" y="176" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13.5" fill="#8b949e">{loc}  ·  {followers} followers  ·  {repos} repositories  ·  ★ {total_stars} stars</text>
-  <rect x="733" y="37" width="130" height="130" fill="#e6edf3"/>
-  <rect x="736" y="40" width="124" height="124" fill="#0d1117"/>
+  <text x="38" y="170" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13.5" fill="#8b949e">Vilnius, {loc}  ·  Full-Stack &amp; AI Systems  ·  {public_repos} public repos</text>
+  <rect x="739" y="35" width="126" height="126" fill="#e6edf3"/>
+  <rect x="742" y="38" width="120" height="120" fill="#0d1117"/>
   {avatar_el}
 </svg>'''
 
 
-def build_stats_hud(commits: int, prs: int, stars: int, best_streak: int) -> str:
+def build_stack_card(top_langs: list[tuple[str, int, str]]) -> str:
+    w, h = 900, 174
+    total_bytes = sum(sz for _, sz, _ in top_langs) or 1
+
+    # Language bar across card
+    bar_x, bar_y, bar_w, bar_h = 38, 62, 824, 12
+    segs = []
+    cx = bar_x
+    for idx, (lname, sz, lcolor) in enumerate(top_langs):
+        seg_w = bar_w - (cx - bar_x) if idx == len(top_langs) - 1 else max(8, round(bar_w * (sz / total_bytes)))
+        segs.append(f'<rect x="{cx}" y="{bar_y}" width="{seg_w}" height="{bar_h}" fill="{lcolor}"/>')
+        cx += seg_w
+
+    # Legend below bar
+    legend = []
+    lx = 38
+    for lname, sz, lcolor in top_langs:
+        pct = round(100 * sz / total_bytes)
+        legend.append(f'<rect x="{lx}" y="86" width="10" height="10" rx="2" fill="{lcolor}"/>')
+        label = f"{lname} {pct}%"
+        legend.append(
+            f'<text x="{lx + 16}" y="95" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" '
+            f'font-size="12.5" fill="#8b949e">{html.escape(label)}</text>'
+        )
+        lx += len(label) * 8 + 38
+
+    # Toolkit pills
+    pills = []
+    px = 38
+    for label, col in STACK_PILLS:
+        pw = len(label) * 7.8 + 26
+        pills.append(
+            f'<rect x="{px:.0f}" y="118" width="{pw:.0f}" height="30" rx="6" fill="#161d29" stroke="#283242" stroke-width="1"/>'
+            f'<rect x="{px + 10:.0f}" y="129" width="7" height="7" rx="1" fill="{col}"/>'
+            f'<text x="{px + 23:.0f}" y="137" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" '
+            f'font-size="12" fill="#e6edf3">{html.escape(label)}</text>'
+        )
+        px += pw + 8
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">
+  <defs>
+    <clipPath id="bar-clip"><rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="{bar_h}" rx="4"/></clipPath>
+  </defs>
+  <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
+  <text x="38" y="42" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="700" letter-spacing="1.5" fill="#3fb950">&gt; STACK</text>
+  <g clip-path="url(#bar-clip)">{"".join(segs)}</g>
+  {"".join(legend)}
+  {"".join(pills)}
+</svg>'''
+
+
+def build_stats_hud(commits: int, public_repos: int, year_contribs: int, top_lang: str) -> str:
     w, h = 900, 108
+    lang_code = top_lang[:2].upper() if top_lang else "TS"
     items = [
         (str(commits), "COMMITS"),
-        (str(prs), "PULL REQS"),
-        (str(stars), "STARS"),
-        (f"{best_streak}D", "BEST STREAK"),
+        (str(public_repos), "PUBLIC REPOS"),
+        (str(year_contribs), "THIS YEAR"),
+        (lang_code, f"TOP LANG ({top_lang.upper()})"),
     ]
     blocks = []
     col_w = (w - 76) / 4
@@ -595,124 +581,13 @@ def build_stats_hud(commits: int, prs: int, stars: int, best_streak: int) -> str
         blocks.append(num_svg)
         blocks.append(
             f'<text x="{bx}" y="82" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" '
-            f'font-size="13" letter-spacing="1.5" fill="#8b949e">{label}</text>'
+            f'font-size="12.5" letter-spacing="1.3" fill="#8b949e">{html.escape(label)}</text>'
         )
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
   <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
   {"".join(blocks)}
 </svg>'''
-
-
-def build_projects_header() -> str:
-    w, h = 900, 46
-    hdr_svg, _ = render_pixel_text("> PROJECTS", 4, 10, scale=4, fill="#3fb950", letter_gap=1)
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
-  {hdr_svg}
-</svg>'''
-
-
-def build_pixel_sprite(seed_text: str, fg: str, bg: str, ox: int, oy: int, size: int = 96) -> str:
-    digest = hashlib.sha256(seed_text.encode("utf-8")).digest()
-    cell = size // 8
-    rects = [f'<rect x="{ox}" y="{oy}" width="{size}" height="{size}" rx="10" fill="{bg}"/>']
-    # 8x8 symmetric pixel identicon (inner 6x6 padded by 1 cell)
-    bit_i = 0
-    for r in range(1, 7):
-        for c in range(1, 4):
-            byte = digest[bit_i // 8]
-            on = (byte >> (bit_i % 8)) & 1
-            bit_i += 1
-            if on:
-                for col in (c, 7 - c):
-                    rects.append(
-                        f'<rect x="{ox + col * cell}" y="{oy + r * cell}" width="{cell}" height="{cell}" fill="{fg}"/>'
-                    )
-    return "\n".join(rects)
-
-
-def build_project_card(repo: dict) -> str:
-    w, h = 440, 168
-    name = repo["name"]
-    desc_raw = (repo.get("description") or "No description provided.").strip()
-    desc_lines = textwrap.wrap(desc_raw, width=35)[:3]
-    if len(desc_lines) == 3 and len(desc_raw) > sum(len(x) for x in desc_lines) + 2:
-        desc_lines[2] = desc_lines[2].rstrip(" .")[:32] + "…"
-    stars = repo.get("stargazerCount", 0)
-    lang = (repo.get("primaryLanguage") or {}).get("name") or "Code"
-    fg, bg, abbr = LANG_META.get(lang, ("#58a6ff", "#16263b", lang[:2].upper()))
-
-    sprite = build_pixel_sprite(name, fg, bg, ox=22, oy=36, size=96)
-    desc_svg = "\n".join(
-        f'<text x="142" y="{66 + i * 20}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" '
-        f'font-size="13.5" fill="#8b949e">{html.escape(line)}</text>'
-        for i, line in enumerate(desc_lines)
-    )
-
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
-  <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
-  {sprite}
-  <text x="142" y="42" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="18" font-weight="700" fill="#f0f6fc">{html.escape(name)}</text>
-  {desc_svg}
-  <text x="142" y="142" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13.5" fill="#3fb950">★ {stars}</text>
-  <rect x="304" y="128" width="22" height="18" rx="3" fill="{fg}"/>
-  <text x="315" y="141" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10.5" font-weight="700" fill="#0d1117">{html.escape(abbr)}</text>
-  <text x="333" y="142" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="13.5" fill="#8b949e">{html.escape(lang)}</text>
-</svg>'''
-
-
-def build_activity_card(weeks: list[dict], cur_streak: int, best_streak: int, year_total: int) -> str:
-    w, h = 900, 224
-    recent_weeks = weeks[-26:]
-    levels = ["#1b222c", "#0e4429", "#006d32", "#26a641", "#39d353"]
-
-    def cell_color(c: int) -> str:
-        if c <= 0:
-            return levels[0]
-        if c <= 2:
-            return levels[1]
-        if c <= 5:
-            return levels[2]
-        if c <= 10:
-            return levels[3]
-        return levels[4]
-
-    grid = []
-    gx, gy = 38, 66
-    cell, gap = 16, 4
-    for wi, wk in enumerate(recent_weeks):
-        for di, day in enumerate(wk["contributionDays"]):
-            col = cell_color(day["contributionCount"])
-            grid.append(
-                f'<rect x="{gx + wi * (cell + gap)}" y="{gy + di * (cell + gap)}" '
-                f'width="{cell}" height="{cell}" rx="2" fill="{col}"/>'
-            )
-
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" shape-rendering="crispEdges">
-  <rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="12" fill="#11161f" stroke="#242c38" stroke-width="1.5"/>
-  <text x="38" y="44" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="700" letter-spacing="1.5" fill="#3fb950">&gt; ACTIVITY</text>
-  {"".join(grid)}
-  <text x="612" y="84" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="1.2" fill="#8b949e">CURRENT STREAK</text>
-  <text x="612" y="108" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="20" font-weight="700" fill="#f0f6fc">{cur_streak} days</text>
-  <text x="612" y="138" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="1.2" fill="#8b949e">BEST STREAK</text>
-  <text x="612" y="162" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="20" font-weight="700" fill="#f0f6fc">{best_streak} days</text>
-  <text x="612" y="190" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="1.2" fill="#8b949e">THIS YEAR</text>
-  <text x="612" y="212" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="20" font-weight="700" fill="#f0f6fc">{year_total}</text>
-</svg>'''
-
-
-def pick_projects(repos: list[dict]) -> list[dict]:
-    by_name = {r["name"].lower(): r for r in repos if not r.get("isPrivate")}
-    picked = []
-    for fname in FEATURED_REPOS:
-        if fname.lower() in by_name:
-            picked.append(by_name[fname.lower()])
-    for r in repos:
-        if len(picked) >= 4:
-            break
-        if not r.get("isPrivate") and r not in picked and r["name"].lower() != USERNAME.lower():
-            picked.append(r)
-    return picked[:4]
 
 
 def main() -> int:
@@ -725,12 +600,11 @@ def main() -> int:
     user = data["user"]
     commits = data["commits"]
     weather = fetch_weather()
+    top_langs = aggregate_languages(user)
 
-    repos = user["repositories"]["nodes"]
-    total_stars = sum(r.get("stargazerCount", 0) for r in repos if not r.get("isPrivate"))
+    public_repos = sum(1 for r in user["repositories"]["nodes"] if not r.get("isPrivate"))
     cc = user["contributionsCollection"]
-    weeks = cc["contributionCalendar"]["weeks"]
-    cur_streak, best_streak = compute_streaks(weeks)
+    year_contribs = cc["contributionCalendar"]["totalContributions"]
 
     avatar_data_uri = ""
     try:
@@ -740,29 +614,15 @@ def main() -> int:
         pass
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "desk-hero.svg").write_text(build_desk_hero(user, commits, weather), encoding="utf-8")
-    (OUT_DIR / "about.svg").write_text(build_about_card(user, total_stars, avatar_data_uri), encoding="utf-8")
+    (OUT_DIR / "desk-hero.svg").write_text(build_desk_hero(user, commits, top_langs, weather), encoding="utf-8")
+    (OUT_DIR / "about.svg").write_text(build_about_card(user, avatar_data_uri), encoding="utf-8")
+    (OUT_DIR / "tech-stack.svg").write_text(build_stack_card(top_langs), encoding="utf-8")
     (OUT_DIR / "stats-hud.svg").write_text(
-        build_stats_hud(
-            cc["totalCommitContributions"],
-            cc["totalPullRequestContributions"],
-            total_stars,
-            best_streak,
-        ),
-        encoding="utf-8",
-    )
-    (OUT_DIR / "projects-header.svg").write_text(build_projects_header(), encoding="utf-8")
-
-    featured = pick_projects(repos)
-    for idx, repo in enumerate(featured):
-        (OUT_DIR / f"project-{idx}.svg").write_text(build_project_card(repo), encoding="utf-8")
-
-    (OUT_DIR / "activity.svg").write_text(
-        build_activity_card(weeks, cur_streak, best_streak, cc["contributionCalendar"]["totalContributions"]),
+        build_stats_hud(cc["totalCommitContributions"], public_repos, year_contribs, top_langs[0][0]),
         encoding="utf-8",
     )
 
-    print(f"Generated {len(list(OUT_DIR.glob('*.svg')))} SVGs in {OUT_DIR}")
+    print(f"Generated 4 SVGs in {OUT_DIR}")
     return 0
 
 

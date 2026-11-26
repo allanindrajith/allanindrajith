@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=b0079f4b" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=45d0532c" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>

@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=9421e54f" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=b0079f4b" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
@@ -9,15 +9,15 @@
 </p>
 
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/about.svg?v=72431dc9" alt="About Allan Indrajith" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/about.svg?v=ac9fad61" alt="About Allan Indrajith" width="100%" /></a>
 </p>
 
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/stats-hud.svg?v=4d0c5046" alt="GitHub Stats" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/stats-hud.svg?v=43395f1d" alt="GitHub Stats" width="100%" /></a>
 </p>
 
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/tech-stack.svg?v=df5fa042" alt="Tech Stack" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/tech-stack.svg?v=30a50d8e" alt="Tech Stack" width="100%" /></a>
 </p>
 
 <p align="left">
@@ -32,5 +32,5 @@
 <!-- PIXEL_STUDIO_PROJECTS:END -->
 
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/activity.svg?v=334325bb" alt="Contribution Activity" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/activity.svg?v=059a4ff9" alt="Contribution Activity" width="100%" /></a>
 </p>

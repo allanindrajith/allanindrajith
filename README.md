@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=dd2b1ae9" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/desk-hero.svg?v=29074147" alt="Allan Indrajith's Pixel Studio" width="100%" /></a>
 </p>
 
 <sub>The window shows the weather in Lithuania right now. The monitor scrolls my latest commits; the shelf holds a book for each language I write.</sub>
@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/stats-hud.svg?v=746f1c47" alt="GitHub Stats" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/stats-hud.svg?v=aca5eb28" alt="GitHub Stats" width="100%" /></a>
 </p>
 
 <p align="center">
@@ -32,5 +32,5 @@
 <!-- PIXEL_STUDIO_PROJECTS:END -->
 
 <p align="center">
-  <a href="#-"><img src="./assets/pixel-studio/activity.svg?v=3b498fe0" alt="Contribution Activity" width="100%" /></a>
+  <a href="#-"><img src="./assets/pixel-studio/activity.svg?v=3ad2ff4c" alt="Contribution Activity" width="100%" /></a>
 </p>
